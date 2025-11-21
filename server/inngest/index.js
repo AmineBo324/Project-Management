@@ -1,12 +1,12 @@
 import { Inngest } from "inngest";
 
 // Create a client to send and receive events
-export const inngest = new Inngest({ id: "my-app" });
+export const inngest = new Inngest({ id: "ProTrackr" });
 
 
 
 const syncUserCreation = inngest.createFunction(
-  { name: "Sync User Creation", event: "clerk/user.created" },
+  { name: "Sync User Creation", event: "clerk/user.created", id: "sync-user-creation" },
   async ({ event }) => {
     // Log the event data to the console
     const {userData} = event
@@ -22,7 +22,7 @@ const syncUserCreation = inngest.createFunction(
 );
 
 const syncUserDeletion = inngest.createFunction(
-  { name: "Sync User Deletion", event: "clerk/user.deleted" },
+  { name: "Sync User Deletion", event: "clerk/user.deleted", id: "sync-user-deletion" },
   async ({ event }) => {
     // Log the event data to the console
     const {userData} = event
@@ -36,7 +36,7 @@ const syncUserDeletion = inngest.createFunction(
 
 
 const syncUserUpdation = inngest.createFunction(
-  { name: "Sync User Update", event: "clerk/user.updated" },
+  { name: "Sync User Update", event: "clerk/user.updated", id: "sync-user-updation" },
   async ({ event }) => {
     // Log the event data to the console
     const {userData} = event
