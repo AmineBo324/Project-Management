@@ -1,6 +1,6 @@
 import { Inngest } from "inngest";
 import prisma from "../configs/prisma.js";
-
+import  sendEmail  from "../configs/nodemailer.js";
 // Create a client to send and receive events
 export const inngest = new Inngest({ id: "ProTrackr" });
 
@@ -123,6 +123,62 @@ const syncWorkspaceMemberCreation = inngest.createFunction(
   }
 );
 
+//Send Email
+const SendTaskAssignmentEmail = inngest.createFunction(
+  { id: "send-task-assignment-email", name: "Send Task Assignment Email" },
+  { event: "app/task.assigned" },
+  async ({ event, step }) => {
+    const { taskId, origin } = event.data;
+    // Logic
+    const task = await prisma.task.findUnique({
+      where: { id: taskId },
+      include: { assignee: true, project: true },
+    });
+
+    await sendEmail({
+      to: task.assignee.email,
+      subject: `New Task Assigned: ${task.project.name}`,
+      html: `<div style="font-family: Arial, sans-serif; line-height: 1.6;">
+        <h2> Hi ${task.assignee.name}</h2>
+        <p>You have been assigned a new task in the project <strong>${task.project.name}</strong>.</p>
+        <p><strong>Task Title:</strong> ${task.title}</p>
+        <div style="margin-top: 20px;">
+        <p style="white-space: pre-wrap;">Description: ${task.description}</p>
+        <p><strong>Due Date:</strong> ${task.due_date.toDateString()}</p>
+        </div>
+        <a href="${origin}/tasks/${task.id}" style="display: inline-block; padding: 10px 15px; margin-top: 20px; background-color: #28a745; color: #ffffff; text-decoration: none; border-radius: 5px;">View Task</a>
+        <p style="margin-top: 20px;"> Best Regards,<br/> ProTrackr Team </p>
+      </div>`,
+    })
+
+    if(new Date(task.due_date).toLocaleDateString() !== new Date().toLocaleDateString()) {
+      await step.sleepUntil('wait-until-due-date', new Date(task.due_date));
+      await step.run('check-if-task-completed', async () => {
+        const task = await prisma.task.findUnique({
+          where: { id: taskId },
+          include: { assignee: true, project: true },
+        });
+        if(!task) return;
+        if(task.status !== 'DONE') {
+          await step.run('send-task-remider-email', async () => {
+            await sendEmail({
+              to: task.assignee.email,
+              subject: `Reminder: Task "${task.title}" is Due Today`,
+              html: `<div style="font-family: Arial, sans-serif; line-height: 1.6;">
+                <h2> Hi ${task.assignee.name}</h2>
+                <p>This is a friendly reminder that the task <strong>"${task.title}"</strong> in the project <strong>${task.project.name}</strong> is due today.</p>
+                <p>Please make sure to complete it on time.</p>
+                <a href="${origin}/tasks/${task.id}" style="display: inline-block; padding: 10px 15px; margin-top: 20px; background-color: #dc3545; color: #ffffff; text-decoration: none; border-radius: 5px;">View Task</a>
+                <p style="margin-top: 20px;"> Best Regards,<br/> ProTrackr Team </p>
+              </div>`,
+            });
+          });
+        }
+      });
+  }
+  }
+);
+
 // Export all functions
 export const functions = [
   syncUserCreation,
@@ -132,4 +188,5 @@ export const functions = [
   syncWorkspaceUpdation,
   syncWorkspaceDeletion,
   syncWorkspaceMemberCreation,
+  SendTaskAssignmentEmail,
 ];
